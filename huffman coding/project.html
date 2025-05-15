@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Huffman Coding Compression Tool</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+      background: #f9f9f9;
+      color: #333;
+    }
+    textarea, input, select {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      font-size: 1rem;
+    }
+    .output {
+      background: #fff;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      margin-top: 1rem;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 1rem;
+      margin: 10px 10px 0 0;
+      cursor: pointer;
+      background: #4caf50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    svg {
+      border: 1px solid #ccc;
+      margin-top: 20px;
+      background: white;
+    }
+    label {
+      font-weight: bold;
+      margin-top: 1rem;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Huffman Coding Compression Tool</h1>
+
+  <label for="inputText">Input Text:</label>
+  <textarea id="inputText" rows="4" placeholder="Enter text to compress...">abacabad</textarea>
+
+  <button onclick="compress()">Compress</button>
+
+  <label for="binaryInput">Binary Input:</label>
+  <textarea id="binaryInput" rows="2" placeholder="Enter binary string to decompress..."></textarea>
+
+  <label for="codeMapInput">Huffman Codes (JSON format):</label>
+  <textarea id="codeMapInput" rows="3" placeholder='e.g. {"a":"0","b":"10","c":"110"}'></textarea>
+
+  <button onclick="decompress()">Decompress</button>
+
+  <div class="output" id="outputArea"></div>
+
+  <script>
+    class Node {
+      constructor(char, freq, left = null, right = null) {
+        this.char = char;
+        this.freq = freq;
+        this.left = left;
+        this.right = right;
+      }
+    }
+
+    function buildFrequencyMap(text) {
+      const freqMap = {};
+      for (let char of text) {
+        freqMap[char] = (freqMap[char] || 0) + 1;
+      }
+      return freqMap;
+    }
+
+    function buildHuffmanTree(freqMap) {
+      const nodes = Object.entries(freqMap).map(([char, freq]) => new Node(char, freq));
+      while (nodes.length > 1) {
+        nodes.sort((a, b) => a.freq - b.freq);
+        const left = nodes.shift();
+        const right = nodes.shift();
+        nodes.push(new Node(null, left.freq + right.freq, left, right));
+      }
+      return nodes[0];
+    }
+
+    function generateCodes(node, path = '', codes = {}) {
+      if (!node) return;
+      if (node.char !== null) {
+        codes[node.char] = path;
+      }
+      generateCodes(node.left, path + '0', codes);
+      generateCodes(node.right, path + '1', codes);
+      return codes;
+    }
+
+    function encodeText(text, codes) {
+      return text.split('').map(char => codes[char]).join('');
+    }
+
+    function decodeText(encodedBits, codeMap) {
+      // Reverse the code map: {"a":"0","b":"10"} => {"0":"a","10":"b"}
+      const reverseCodes = {};
+      for (let char in codeMap) {
+        reverseCodes[codeMap[char]] = char;
+      }
+
+      let current = '';
+      let result = '';
+      for (let bit of encodedBits) {
+        current += bit;
+        if (reverseCodes[current]) {
+          result += reverseCodes[current];
+          current = '';
+        }
+      }
+      return result;
+    }
+
+    function convertToD3Tree(node) {
+      if (!node) return null;
+      const label = node.char !== null ? `${node.char} (${node.freq})` : `* (${node.freq})`;
+      const children = [];
+      if (node.left) children.push(convertToD3Tree(node.left));
+      if (node.right) children.push(convertToD3Tree(node.right));
+      return { name: label, children: children.length ? children : undefined };
+    }
+
+    function visualizeTreeWithD3(rootNode) {
+      d3.select("#huffmanTree").remove();
+
+      const data = convertToD3Tree(rootNode);
+      const width = 800;
+      const height = 400;
+
+      const svg = d3.select("#outputArea")
+        .append("svg")
+        .attr("id", "huffmanTree")
+        .attr("width", width)
+        .attr("height", height);
+
+      const treeLayout = d3.tree().size([width - 100, height - 100]);
+      const root = d3.hierarchy(data);
+      treeLayout(root);
+
+      svg.selectAll('line')
+        .data(root.links())
+        .enter()
+        .append('line')
+        .attr('x1', d => d.source.x + 50)
+        .attr('y1', d => d.source.y + 50)
+        .attr('x2', d => d.target.x + 50)
+        .attr('y2', d => d.target.y + 50)
+        .attr('stroke', '#ccc');
+
+      svg.selectAll('circle')
+        .data(root.descendants())
+        .enter()
+        .append('circle')
+        .attr('cx', d => d.x + 50)
+        .attr('cy', d => d.y + 50)
+        .attr('r', 20)
+        .attr('fill', '#4caf50');
+
+      svg.selectAll('text')
+        .data(root.descendants())
+        .enter()
+        .append('text')
+        .attr('x', d => d.x + 50)
+        .attr('y', d => d.y + 50)
+        .attr('dy', 5)
+        .attr('text-anchor', 'middle')
+        .attr('fill', 'white')
+        .text(d => d.data.name);
+    }
+
+    function compress() {
+      const text = document.getElementById('inputText').value.trim();
+      const output = document.getElementById('outputArea');
+      output.innerHTML = '';
+
+      if (!text) {
+        alert("Please enter text to compress.");
+        return;
+      }
+
+      const freqMap = buildFrequencyMap(text);
+      const tree = buildHuffmanTree(freqMap);
+      const codes = generateCodes(tree);
+      const encoded = encodeText(text, codes);
+      const decoded = decodeText(encoded, codes);
+
+      output.innerHTML += `<h3>Character Frequencies:</h3><pre>${JSON.stringify(freqMap, null, 2)}</pre>`;
+      output.innerHTML += `<h3>Generated Huffman Codes:</h3><pre>${JSON.stringify(codes, null, 2)}</pre>`;
+      output.innerHTML += `<h3>Encoded Binary String:</h3><pre>${encoded}</pre>`;
+      output.innerHTML += `<h3>Decoded Text (from encoded):</h3><pre>${decoded}</pre>`;
+      output.innerHTML += `<h3>Huffman Tree Visualization:</h3>`;
+      visualizeTreeWithD3(tree);
+
+      // Auto-fill codeMapInput
+      document.getElementById('codeMapInput').value = JSON.stringify(codes, null, 2);
+    }
+
+    function decompress() {
+      const binary = document.getElementById('binaryInput').value.trim();
+      const codeMapRaw = document.getElementById('codeMapInput').value.trim();
+      const output = document.getElementById('outputArea');
+      output.innerHTML = '';
+
+      if (!binary || !codeMapRaw) {
+        alert("Please provide both binary string and Huffman code map.");
+        return;
+      }
+
+      let codeMap;
+      try {
+        codeMap = JSON.parse(codeMapRaw);
+      } catch (e) {
+        alert("Invalid JSON in Huffman code map.");
+        return;
+      }
+
+      const decoded = decodeText(binary, codeMap);
+      output.innerHTML += `<h3>Decoded Text:</h3><pre>${decoded}</pre>`;
+    }
+  </script>
+
+</body>
+</html>
