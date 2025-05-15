@@ -3,6 +3,7 @@
 import sys
 import os
 from typing import List
+import string
 
 def word_break_rec(ind: int, s: str, dictionary: List[str], dp: List[int],
                    path: List[str], all_results: List[List[str]]) -> bool:
@@ -81,6 +82,7 @@ if __name__ == '__main__':
             with open(sys.argv[1], 'r') as f:
                 lines = [line.strip() for line in f.readlines()]
                 s = lines[0]
+                s = s.translate(str.maketrans('', '', string.punctuation))  # Remove punctuation
                 n = int(lines[1])
                 dictionary = lines[2:2 + n]
 

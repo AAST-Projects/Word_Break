@@ -1,13 +1,13 @@
-Input string: applebananapeach
+Input string: APPLEBANANAJUICE
 Can be segmented: True
 
 Valid segmentations:
-1. apple banana peach
+1. APPLE BANANA JUICE
 
 Split point indices:
-0 → 5: 'apple'
-5 → 11: 'banana'
-11 → 16: 'peach'
+0 → 5: 'APPLE'
+5 → 11: 'BANANA'
+11 → 16: 'JUICE'
 ---
 
 DP Table:
